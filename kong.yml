@@ -1,0 +1,46 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: my-backend-api
+    url: http://backend-api:5000 # Use Docker service name instead of host.docker.internal
+    routes:
+      - name: root-route
+        paths:
+          - /
+        strip_path: false
+      - name: public-route
+        paths:
+          - /public
+        strip_path: false
+      - name: protected-route
+        paths:
+          - /protected
+        strip_path: false
+        plugins:
+          - name: jwt # Attach JWT plugin to protected route
+      - name: admin-route
+        paths:
+          - /admin
+        methods: ["POST"]
+        strip_path: false
+        plugins:
+          - name: jwt
+          - name: rate-limiting # Example: apply rate limit to admin route
+            config:
+              minute: 5 # 5 requests per minute
+              policy: local # Use local in-memory storage for simplicity
+
+consumers:
+  - username: test-user
+    jwt_secrets:
+      - algorithm: HS256
+        key: CouldBeASecret
+        secret: 8b2e5c1a9d4f7e3b6c0a2d8f5b1e7c3a8b2e5c1a9d4f7e3b6c0a2d8f5b1e7c3a
+
+plugins:
+  # JWT Plugin configuration
+  - name: jwt
+    config:
+      # Allow requests without JWT to reach public endpoints
+      anonymous: test-user

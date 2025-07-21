@@ -1,0 +1,138 @@
+# docker-compose.yml
+version: "3.8" # You can remove this line as discussed, it's just a warning
+
+services: # <--- No indentation
+  kong-database: # <--- Two spaces indentation
+    image: postgres:13 # <--- Four spaces indentation
+    container_name: kong-database
+    environment:
+      POSTGRES_DB: kong
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kongpass
+    volumes:
+      - kong_data:/var/lib/postgresql/data
+    networks:
+      - kong-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  kong-migrations: # <--- Two spaces indentation
+    image: kong/kong-gateway:3.11.0.1
+    container_name: kong-migrations
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kongpass
+      KONG_PASSWORD: admin_password
+    networks:
+      - kong-net
+    command: kong migrations bootstrap
+    depends_on:
+      kong-database:
+        condition: service_healthy
+
+  kong: # <--- Two spaces indentation
+    image: kong/kong-gateway:3.11.0.1
+    container_name: kong
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kongpass
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001, 0.0.0.0:8444 ssl
+      KONG_PROXY_LISTEN: 0.0.0.0:8000, 0.0.0.0:8443 ssl
+      KONG_PASSWORD: admin_password
+      KONG_DECLARATIVE_CONFIG: /opt/kong/kong.yml
+      # KONG_LUA_PACKAGE_PATH: "/usr/local/share/lua/5.1/?.lua;;"
+      # KONG_PLUGINS: "bundled,my-authz-plugin"
+    volumes:
+      - ./kong.yml:/opt/kong/kong.yml:ro
+      # - ./custom_plugins:/usr/local/share/lua/5.1/kong/plugins:ro
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+      - "8001:8001"
+      - "8444:8444"
+    networks:
+      - kong-net
+    depends_on:
+      kong-migrations:
+        condition: service_completed_successfully
+      kong-database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/status || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  backend-api: # <--- Two spaces indentation
+    build:
+      context: ./backend-api
+      dockerfile: Dockerfile
+    container_name: backend-api
+    ports:
+      - "5000:5000"
+    networks:
+      - kong-net
+    environment:
+      - FLASK_ENV=production
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/public || exit 1"] # Make sure curl is installed in backend-api image
+      interval: 10s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  prometheus: # <--- Two spaces indentation
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.listen-address=:9090
+    ports:
+      - "9090:9090"
+    networks:
+      - kong-net
+    depends_on:
+      - kong
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/ready || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  grafana: # <--- Two spaces indentation
+    image: grafana/grafana:11.0.0
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin_password
+    ports:
+      - "3000:3000"
+    networks:
+      - kong-net
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes: # <--- No indentation
+  kong_data: # <--- Two spaces indentation
+
+networks: # <--- No indentation
+  kong-net: # <--- Two spaces indentation
+    driver: bridge
