@@ -68,7 +68,6 @@ Follow these steps to set up and run the project locally.
     cd secure-api-gateway
     ```
 
-    (Replace `https://github.com/your-username/secure-api-gateway.git` with your actual repository URL if you've forked/created one).
 
 2.  **Verify/Create Configuration Files:**
     Ensure you have the following files in your project root (`secure-api-gateway/`):
